@@ -1,0 +1,8 @@
+torch
+langchain
+pillow
+OpenAI
+dotenv
+gradio
+google-search-results
+gradio_multimodalchatbot
