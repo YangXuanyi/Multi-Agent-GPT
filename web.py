@@ -2,6 +2,7 @@
 主文件: 用来从web界面测试multi-agent-gpt的性能
 """
 #加载环境变量，其中包括openai的API密钥等设置
+import os
 from dotenv import load_dotenv
 load_dotenv()
 #调用依赖包

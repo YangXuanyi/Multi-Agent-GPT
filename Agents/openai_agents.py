@@ -33,41 +33,54 @@ class AgentModel():
         
         '''
         self.trace_log = trace_log
-        
-        #实例化LLM
+        #定义LLM
         self.llm = ChatOpenAI(temperature=0, model_name="gpt-3.5-turbo")
-        
         #定义目前可用的工具
         self.tools = [ImageExpressionByDalle(), InternetSearch()]
+        #定义系统提示词, 需要根据实际工具进行重写
+        self.system_message = self.init_SystemPrompt()
+        
+    def init_SystemPrompt(self):
+        """
+        重写llm中的系统提示词, 让llm能够正确的选择Tools完成任务,
+        该函数的设置与agent使用的Tools有关
+        """
+        #重写llm中的system prompt，让模型凡是遇到生成图像问题统一交给Tool来解决
+        system_message = PREFIX + "\n" + '''
+            Unfortunately, the assistant is unable to generate images based on text. 
+            Assistants should always refer to available tools and not attempt to answer any drawing related questions on their own. 
+            When deciding to use a text generated image tool, please generate detailed prompts for the tool based on the user's questions'''
+        
+        return system_message
+    
+    
+    def init_openai_agent(self, memory=None):
+        """
+        实例化一个基于openai的agent
+        为了实现上下文对话的记忆, 需要传入memory
+        """
         
         #实例化agent
-        self.agent = initialize_agent(
-                            agent='chat-conversational-react-description',
+        agent = initialize_agent(
+                            agent=AgentType.CHAT_CONVERSATIONAL_REACT_DESCRIPTION,
                             tools=self.tools,
                             llm=self.llm,
                             verbose=True,
                             max_iterations=3,
                             early_stopping_method='generate',
-                            memory=ConversationBufferWindowMemory(
-                            memory_key='chat_history',
-                            k=5,
-                            return_messages=True
-                            )
+                            memory=memory
                         )
-
-        #重写llm中的system prompt，让模型凡是遇到生成图像问题统一交给Tool来解决
-        self.system_message = PREFIX + "\n" + '''
-            Unfortunately, the assistant is unable to generate images based on text. 
-            Assistants should always refer to available tools and not attempt to answer any drawing related questions on their own. 
-            When deciding to use a text generated image tool, please generate detailed prompts for the tool based on the user's questions'''
-
-        #特殊语法,记住
-        self.new_prompt = self.agent.agent.create_prompt(
+        
+        #传入重写的系统提示词, 让agent更好的完成任务
+        new_prompt = agent.agent.create_prompt(
                         system_message=self.system_message,
                         tools=self.tools
                         )
-        self.agent.agent.llm_chain.prompt = self.new_prompt
+        agent.agent.llm_chain.prompt = new_prompt
+        
+        return agent
     
+        
     def aq_agent_MultimodalChatbot_web(self, question:str, chat_history: list=[]):
         """
         多模态显示的web端
@@ -75,23 +88,26 @@ class AgentModel():
         user_msg = {"text": question,
             "files": []
         }
-        
+        #获取历史会话只内存
+        memory = self.load_history2memory(window_length=5, chat_history=chat_history)
+        #实例化agent
+        agent = self.init_openai_agent(memory=memory)
+ 
         if self.trace_log:
             #先实例化日志输出类，指定可以将log读入内存，然后调用智能体开始监视
             console_output = ConsoleOutput()
             # 重定向sys.stdout到ConsoleOutput对象和日志文件对象
             sys.stdout = console_output
-            result = self.agent(question)
+            result = agent(question)
             log = console_output.get_information()
             robot_msg = self.data_postprocess(result, log)   
         else:
-            result = self.agent(question)
+            result = agent(question)
             robot_msg = user_msg
         
         chat_history.append([user_msg, robot_msg])
+        
         return "", chat_history
-    
-        #return [[user_msg, robot_msg]]
     
     def data_postprocess(self, result, log):
         """
@@ -110,22 +126,46 @@ class AgentModel():
                          "files": []}
         return robot_msg
     
+    def load_history2memory(self, window_length, chat_history):
+        """
+        将chat_history读入内存中, 作为上下文对话信息输入agent, 实现关注上下文的多轮对话
+        window_length: 设置当前问答中关注的上下文窗口大小
+        chat_history: 自对话启动后所有的历史对话记录 
+        """
+        #定义agent需要的对话记录形式memory
+        memory=ConversationBufferWindowMemory(
+                            memory_key='chat_history',
+                            k=window_length,
+                            return_messages=True
+                            )
+        
+        #从chat_history制作上下文关系memory
+        memory_list = chat_history[-window_length:]
+        for i in range(len(memory_list)):
+            input_context = memory_list[i][0].text
+            output_context = memory_list[i][1].text
+            memory.save_context({"input": input_context}, 
+                                {"output": output_context})
+        
+        return memory
+    
     def qa_agent_web(self, question: str):
         """
-        web端专用qa
+        web端专用qa,当前在弃用状态
         """
+        agent = self.init_openai_agent()
         json = '\n the trace log is:\n'
         if self.trace_log:
             #先实例化日志输出类，指定可以将log读入内存，然后调用智能体开始监视
             console_output = ConsoleOutput()
             # 重定向sys.stdout到ConsoleOutput对象和日志文件对象
             sys.stdout = console_output
-            result = self.agent(question)
+            result = agent(question)
             log = console_output.get_information()
             json_data, observation_data = extract_json_and_observation(log)
             json = str(json_data[0])
         else:
-            result = self.agent(question)
+            result = agent(question)
         
         
         #关于输出的格式说明：
@@ -140,8 +180,15 @@ class AgentModel():
         """
         调试专用qa接口
         """
-        result = self.agent(question)
-        return result
+        memory=ConversationBufferWindowMemory(
+                            memory_key='chat_history',
+                            k=5,
+                            return_messages=True
+                            )
+        agent = self.init_openai_agent(memory=memory)
+        result = agent(question)
+        output =  result["output"]
+        return output
     
     
 # #提问

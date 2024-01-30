@@ -2,7 +2,7 @@ torch
 langchain
 pillow
 OpenAI
-dotenv
+python-dotenv
 gradio
 google-search-results
 gradio_multimodalchatbot
