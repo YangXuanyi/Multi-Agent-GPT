@@ -1,6 +1,6 @@
 <div align="center">
 
-![poster](./Imgs/Show/poster.png)
+![poster](https://github.com/YangXuanyi/Multi-Agent-GPT/assets/83216339/b111f8f3-3b14-42dc-89b3-9a26c7a7deeb)
 
 ##
 
@@ -86,7 +86,7 @@ The program will run a local URL: http://XXX. Open using a local browser to see 
 
 <div align="center">
 
-![demo](./Imgs/Show/demo.png)
+![demo](https://github.com/YangXuanyi/Multi-Agent-GPT/assets/83216339/82444566-c7db-41ab-b471-cc3fba5ada82)
 
 </div>
 
@@ -98,7 +98,7 @@ By integrating the BLIP model, agents can understand image information and provi
 
 <div align="center">
 
-![image](./Imgs/Show/chat_with_image.gif)
+![chat_with_image](https://github.com/YangXuanyi/Multi-Agent-GPT/assets/83216339/2e5ec67c-eaee-4eca-adc8-fc63a827d990)
 
 </div>
 
