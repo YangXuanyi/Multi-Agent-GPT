@@ -96,11 +96,6 @@ The program will run a local URL: http://XXX. Open using a local browser to see 
 
 By integrating the BLIP model, agents can understand image information and provide high-quality dialogue information.
 
-<div align="center">
-
-![chat_with_image](https://github.com/YangXuanyi/Multi-Agent-GPT/assets/83216339/2e5ec67c-eaee-4eca-adc8-fc63a827d990)
-
-</div>
 
 
 ## 🗄️ 3 Structure
