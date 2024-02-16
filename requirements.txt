@@ -1,5 +1,4 @@
-#need to install
-torch
+torch==2.2.0
 langchain
 pillow
 OpenAI
@@ -7,3 +6,5 @@ python-dotenv
 gradio
 google-search-results
 gradio_multimodalchatbot
+gradio_rich_textbox
+transformers

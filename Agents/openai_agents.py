@@ -14,12 +14,11 @@ from PIL import Image
 
 from Tools.ImageGeneration import ImageExpressionByDalle  #导入生成图像工具
 from Tools.search import InternetSearch  #联网搜索工具
+from Tools.ImageCaption import ImageCaption #图像内容理解工具
 from Utils.stdio import ConsoleOutput
 from Utils.utils_json import extract_json_and_observation, extract_urls
+from Utils.data_io import multifile_classification
 
-
-# os.environ["OPENAI_API_BASE"] = 'https://oneapi.xty.app/v1'
-# os.environ["OPENAI_API_KEY"] = 'sk-yIjuHjfVC2v4Of88050b6a4404444d9eAdD507DfC1Dd382d'
 
 class AgentModel():
     """
@@ -39,6 +38,9 @@ class AgentModel():
         self.tools = [ImageExpressionByDalle(), InternetSearch()]
         #定义系统提示词, 需要根据实际工具进行重写
         self.system_message = self.init_SystemPrompt()
+        
+        #加载图像理解工具
+        self.imagecaption = ImageCaption()
         
     def init_SystemPrompt(self):
         """
@@ -81,32 +83,46 @@ class AgentModel():
         return agent
     
         
-    def aq_agent_MultimodalChatbot_web(self, question:str, chat_history: list=[]):
+    def aq_agent_MultimodalChatbot_web(self, question, chat_history, multifile):
         """
         多模态显示的web端
         """
-        user_msg = {"text": question,
-            "files": []
-        }
+
         #获取历史会话只内存
         memory = self.load_history2memory(window_length=5, chat_history=chat_history)
         #实例化agent
         agent = self.init_openai_agent(memory=memory)
- 
-        if self.trace_log:
-            #先实例化日志输出类，指定可以将log读入内存，然后调用智能体开始监视
-            console_output = ConsoleOutput()
-            # 重定向sys.stdout到ConsoleOutput对象和日志文件对象
-            sys.stdout = console_output
-            result = agent(question)
-            log = console_output.get_information()
-            robot_msg = self.data_postprocess(result, log)   
+        
+        #处理非文字模态的输入信息
+        if multifile != None:
+            file_type, file_path = multifile_classification(multifile)
+            if file_type == "image":
+                image = Image.open(file_path)
+                text = question
+                caption_result = self.imagecaption.infer_image(image,text)
+            user_msg = {"text": question,
+                        "files": [{"file": FileData(path=file_path)}]}
         else:
-            result = agent(question)
-            robot_msg = user_msg
+            user_msg = {"text": question,
+                    "files": []}
         
+        #先实例化日志输出类，指定可以将log读入内存，然后调用智能体开始监视
+        console_output = ConsoleOutput()
+        # 重定向sys.stdout到ConsoleOutput对象和日志文件对象
+        sys.stdout = console_output
+        
+        # 考虑当前问题是否涉及到处理多模态文件，
+        # 如果涉及则使用大模型对问题+多模态识别结果进行二次预测
+        if multifile != None:
+            prompt = '这是一个看图回答问题的对话, 不用调用任何Tool, 请直接用中文回答。目前图像中的内容可以总结为：' \
+                     + caption_result  + '\n请根据图像中的内容和回答下面的问题: '
+            question =  prompt + question
+        
+        result = agent(question)
+        log = console_output.get_information()
+        robot_msg = self.data_postprocess(result, log)   
         chat_history.append([user_msg, robot_msg])
-        
+
         return "", chat_history
     
     def data_postprocess(self, result, log):
